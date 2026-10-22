@@ -1,0 +1,21 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="52" x2="430" y2="452" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B4EA2"/>
+      <stop offset="1" stop-color="#072D62"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="146" y1="112" x2="378" y2="398" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD954"/>
+      <stop offset="1" stop-color="#F6C400"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <path d="M396 148C396 128.118 379.882 112 360 112H188L116 184V364C116 383.882 132.118 400 152 400H360C379.882 400 396 383.882 396 364V148Z" fill="#F8FBFF"/>
+  <path d="M188 112V160C188 173.255 177.255 184 164 184H116L188 112Z" fill="#D9E5F6"/>
+  <rect x="214" y="112" width="124" height="44" rx="18" fill="url(#accent)"/>
+  <path d="M190 242L223 275L320 178" stroke="#0B4EA2" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="178" y="296" width="156" height="18" rx="9" fill="#C5D6EE"/>
+  <rect x="178" y="334" width="122" height="18" rx="9" fill="#D7E3F3"/>
+  <circle cx="124" cy="124" r="44" fill="#F6C400"/>
+  <text x="124" y="138" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#072D62">DF</text>
+</svg>

@@ -1,0 +1,437 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b2345">
+  <meta name="description" content="Checklist digital profissional para oficina DF Pneus Michelin.">
+  <title>Checklist Digital - DF Pneus Michelin</title>
+
+  <link rel="icon" type="image/svg+xml" href="assets/icons/checklist-app.svg?v=7">
+  <link rel="apple-touch-icon" href="assets/icons/checklist-app-512.png?v=7">
+  <link rel="manifest" href="manifest.webmanifest?v=7">
+  <link rel="stylesheet" href="assets/css/checklist.css?v=7">
+</head>
+
+<body>
+  <div class="page">
+
+    <!-- CABEÇALHO -->
+    <section class="hero">
+      <div class="brand-card">
+        <div class="brand-row">
+          <div class="badge" aria-hidden="true">
+            <span class="badge__main">DF</span>
+            <span class="badge__sub">Premium</span>
+          </div>
+          <div>
+            <h1>Checklist Digital<br>DF PNEUS MICHELIN</h1>
+            <p>
+              Formulário digital da oficina. Preencha os dados do veículo,
+              registre as avaliações e compartilhe ou imprima o checklist.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="action-card hidden-print">
+        <div>
+          <h2>Ações Rápidas</h2>
+          <p>Gere o resumo, envie por e-mail, compartilhe ou imprima em PDF.</p>
+        </div>
+
+        <div class="button-grid">
+          <button class="primary" type="button" id="generateSummaryBtn">
+            Gerar resumo
+          </button>
+          <button class="secondary" type="button" id="sendEmailBtn">
+            Enviar e-mail
+          </button>
+          <button class="neutral" type="button" id="shareChecklistBtn">
+            Compartilhar
+          </button>
+          <button class="neutral" type="button" id="printChecklistBtn">
+            Imprimir / PDF
+          </button>
+        </div>
+
+        <div class="action-meta">
+          <span class="status-chip" id="draftStatus">Checklist pronto</span>
+          <span class="status-chip status-chip--info" id="fipeStatus">
+            Conectando FIPE...
+          </span>
+        </div>
+      </aside>
+    </section>
+
+    <!-- CONFIGURAÇÃO DA LOJA -->
+    <section class="panel hidden-print">
+      <div class="section-title">
+        <h2>Configuração da Loja</h2>
+      </div>
+
+      <div class="grid grid-3">
+        <div>
+          <label for="storeName">Nome da loja</label>
+          <input id="storeName" type="text" value="DF Pneus Michelin Araraquara">
+        </div>
+
+        <div>
+          <label for="storeEmail">E-mail de destino</label>
+          <input id="storeEmail" type="email" value="dfpneus2@hotmail.com">
+        </div>
+
+        <div>
+          <label for="storePhone">Telefone / WhatsApp</label>
+          <input
+            id="storePhone"
+            type="text"
+            inputmode="tel"
+            autocomplete="tel"
+            placeholder="(00) 00000-0000"
+          >
+        </div>
+      </div>
+    </section>
+
+    <!-- DADOS INICIAIS -->
+    <section class="panel">
+      <div class="section-title">
+        <h2>Dados Iniciais</h2>
+      </div>
+
+      <div class="grid grid-4">
+
+        <div class="span-4 fipe-panel hidden-print">
+          <div class="fipe-panel-head">
+            <h3>Consulta de Veículo</h3>
+          </div>
+
+          <div class="fipe-grid">
+            <div>
+              <label for="fipeBrand">Marca</label>
+              <select id="fipeBrand">
+                <option value="">Carregando marcas...</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="fipeModel">Modelo</label>
+              <select id="fipeModel" disabled>
+                <option value="">Aguardando marca...</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="fipeYear">Ano</label>
+              <select id="fipeYear" disabled>
+                <option value="">Aguardando modelo...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="fipe-result" id="fipeVehicleDetails">
+            <div class="fipe-result-empty">
+              Selecione marca, modelo e ano para preencher o veículo automaticamente.
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label for="date">Data</label>
+          <input id="date" type="date" autocomplete="off">
+        </div>
+
+        <div class="span-2">
+          <label for="clientName">Cliente</label>
+          <input id="clientName" type="text" autocomplete="name">
+        </div>
+
+        <div>
+          <label for="phone">Telefone</label>
+          <input id="phone" type="text" inputmode="tel" autocomplete="tel">
+        </div>
+
+        <div>
+          <label for="plate">Placa</label>
+          <input
+            id="plate"
+            type="text"
+            maxlength="8"
+            autocomplete="off"
+            placeholder="ABC1D23"
+          >
+        </div>
+
+        <div class="span-3">
+          <label for="vehicle">Veículo (Marca / Modelo / Ano)</label>
+          <input id="vehicle" type="text" autocomplete="off">
+        </div>
+
+        <div>
+          <label for="km">KM</label>
+          <input id="km" type="text" inputmode="numeric" autocomplete="off">
+        </div>
+
+        <div>
+          <label for="osNumber">Nº OS</label>
+          <input id="osNumber" type="text" autocomplete="off">
+        </div>
+
+        <div>
+          <label for="sellerName">Vendedor</label>
+          <input id="sellerName" type="text" autocomplete="name">
+        </div>
+
+        <div>
+          <label for="technicianName">Técnico</label>
+          <input id="technicianName" type="text" autocomplete="name">
+        </div>
+      </div>
+
+      <div class="grid grid-3 section-gap-top">
+        <div class="radio-card">
+          <span class="radio-card-title">Veículo de Funcionário?</span>
+          <div class="radio-card-options">
+            <label><input type="radio" name="Veiculo_Funcionario" value="SIM"> Sim</label>
+            <label><input type="radio" name="Veiculo_Funcionario" value="NÃO"> Não</label>
+          </div>
+        </div>
+
+        <div class="radio-card">
+          <span class="radio-card-title">Garantia de Peça?</span>
+          <div class="radio-card-options">
+            <label><input type="radio" name="Garantia_Peca" value="SIM"> Sim</label>
+            <label><input type="radio" name="Garantia_Peca" value="NÃO"> Não</label>
+          </div>
+        </div>
+
+        <div class="radio-card">
+          <span class="radio-card-title">Somente Orçamento?</span>
+          <div class="radio-card-options">
+            <label><input type="radio" name="Somente_Orcamento" value="SIM"> Sim</label>
+            <label><input type="radio" name="Somente_Orcamento" value="NÃO"> Não</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVIÇOS SOLICITADOS -->
+    <section class="panel">
+      <div class="section-title">
+        <h2>Produtos / Serviços Solicitados pelo Cliente</h2>
+      </div>
+
+      <div class="grid grid-4">
+        <div>
+          <label for="servico1">Serviço 1</label>
+          <input type="text" id="servico1">
+        </div>
+
+        <div>
+          <label for="servico2">Serviço 2</label>
+          <input type="text" id="servico2">
+        </div>
+
+        <div>
+          <label for="servico3">Serviço 3</label>
+          <input type="text" id="servico3">
+        </div>
+
+        <div>
+          <label for="servico4">Serviço 4</label>
+          <input type="text" id="servico4">
+        </div>
+      </div>
+    </section>
+
+    <!-- FAMÍLIAS DE AVALIAÇÃO GERADAS PELO JAVASCRIPT -->
+    <div id="evaluationSections"></div>
+
+    <!-- AVARIAS E FOTOS -->
+    <section class="panel">
+      <div class="section-title">
+        <h2>Mapa Visual de Avarias e Fotos</h2>
+      </div>
+
+      <div class="damage-map-panel">
+        <div class="damage-map-header">
+          <div>
+            <h3>Assinale visualmente os pontos do veículo</h3>
+            <p>Escolha o tipo da avaria e clique nos pontos para marcar o veículo de forma clara para o cliente.</p>
+          </div>
+
+          <div class="damage-type-toolbar" id="damageTypeToolbar" role="group" aria-label="Tipo de avaria">
+            <button type="button" class="neutral is-active" data-damage-type="Amassado">Amassado</button>
+            <button type="button" class="neutral" data-damage-type="Riscado">Riscado</button>
+            <button type="button" class="neutral" data-damage-type="Quebrado">Quebrado</button>
+            <button type="button" class="neutral" data-damage-type="Faltante">Faltante</button>
+            <button type="button" class="neutral" data-damage-type="Trincado">Trincado</button>
+          </div>
+        </div>
+
+        <div class="damage-map-stage">
+          <div class="damage-map-canvas" aria-label="Mapa visual do veículo">
+            <img
+              class="damage-map-illustration"
+              src="assets/images/veiculo.png?v=3"
+              alt="Mapa de avarias com vistas do veículo"
+            >
+
+            <button class="damage-map-hotspot" data-location="Vista superior - esquerda superior" style="--x: 6.42%; --y: 30.15%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista superior - esquerda inferior" style="--x: 5.38%; --y: 56.42%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista superior - direita central" style="--x: 26.50%; --y: 42.39%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista superior - direita inferior" style="--x: 28.36%; --y: 60.30%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista superior - dianteira" style="--x: 23.81%; --y: 71.04%;" type="button" tabindex="0"></button>
+
+            <button class="damage-map-hotspot" data-location="Vista traseira - esquerda superior" style="--x: 25.05%; --y: 23.28%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista traseira - esquerda inferior" style="--x: 25.05%; --y: 35.22%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista traseira - direita superior" style="--x: 51.14%; --y: 32.24%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista traseira - direita inferior" style="--x: 51.55%; --y: 47.46%;" type="button" tabindex="0"></button>
+
+            <button class="damage-map-hotspot" data-location="Lateral superior - traseira superior" style="--x: 56.11%; --y: 22.09%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - teto central" style="--x: 76.60%; --y: 20.30%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - dianteira superior" style="--x: 83.02%; --y: 23.58%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - ponta dianteira" style="--x: 94.00%; --y: 27.76%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - traseira central" style="--x: 56.31%; --y: 40.00%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - traseira inferior" style="--x: 56.11%; --y: 56.12%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - centro inferior" style="--x: 65.63%; --y: 59.10%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - dianteira inferior" style="--x: 76.19%; --y: 59.10%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral superior - ponta inferior" style="--x: 94.00%; --y: 48.06%;" type="button" tabindex="0"></button>
+
+            <button class="damage-map-hotspot" data-location="Vista dianteira - esquerda superior" style="--x: 25.05%; --y: 66.57%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista dianteira - esquerda inferior" style="--x: 24.43%; --y: 75.82%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista dianteira - direita superior" style="--x: 51.35%; --y: 59.40%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Vista dianteira - direita inferior" style="--x: 51.55%; --y: 74.33%;" type="button" tabindex="0"></button>
+
+            <button class="damage-map-hotspot" data-location="Lateral inferior - dianteira superior" style="--x: 53.21%; --y: 60.30%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral inferior - dianteira inferior" style="--x: 53.42%; --y: 73.43%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral inferior - centro inferior esquerdo" style="--x: 65.84%; --y: 83.28%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral inferior - centro inferior direito" style="--x: 76.19%; --y: 82.99%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral inferior - traseira superior" style="--x: 77.23%; --y: 67.46%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral inferior - traseira central" style="--x: 83.64%; --y: 60.90%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral inferior - traseira ponta" style="--x: 94.41%; --y: 65.07%;" type="button" tabindex="0"></button>
+            <button class="damage-map-hotspot" data-location="Lateral inferior - traseira inferior" style="--x: 94.20%; --y: 75.52%;" type="button" tabindex="0"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="damage-tools">
+        <div class="manual-damage-head">
+          <h3>Registro manual complementar</h3>
+          <p>Use os campos abaixo para observações adicionais e detalhes específicos.</p>
+        </div>
+
+        <div class="damage-form-grid">
+          <div>
+            <label for="damageLocation">Local da avaria</label>
+            <select id="damageLocation">
+              <option value="">Selecione</option>
+              <option>Dianteira</option>
+              <option>Traseira</option>
+              <option>Lateral esquerda</option>
+              <option>Lateral direita</option>
+              <option>Capô</option>
+              <option>Teto</option>
+              <option>Parachoque</option>
+              <option>Porta</option>
+              <option>Roda</option>
+              <option>Retrovisor</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="damageType">Tipo de avaria</label>
+            <select id="damageType">
+              <option value="">Selecione</option>
+              <option>Amassado</option>
+              <option>Riscado</option>
+              <option>Quebrado</option>
+              <option>Faltante</option>
+              <option>Trincado</option>
+            </select>
+          </div>
+
+          <div class="full">
+            <label for="damageNote">Observação da avaria</label>
+            <textarea id="damageNote"></textarea>
+          </div>
+        </div>
+
+        <div>
+          <button type="button" class="primary hidden-print" id="addDamage">
+            + Adicionar avaria
+          </button>
+        </div>
+      </div>
+
+      <div class="damage-list" id="damageList"></div>
+
+      <div class="upload-box upload-box--spaced hidden-print">
+        <label for="damagePhotos">Anexar fotos</label>
+        <input id="damagePhotos" type="file" accept="image/*" multiple>
+        <div class="preview-grid" id="photoPreview"></div>
+      </div>
+    </section>
+
+    <!-- OBSERVAÇÕES, RESUMO E ASSINATURAS -->
+    <section class="panel">
+      <div class="section-title">
+        <h2>Anotações Finais e Resumo</h2>
+      </div>
+
+      <div class="grid summary-layout">
+        <div class="notes-panel">
+          <label for="generalNotes">Observações gerais</label>
+          <textarea id="generalNotes"></textarea>
+        </div>
+
+        <div class="summary-panel">
+          <label>Resumo para e-mail / WhatsApp</label>
+          <div class="summary-box" id="summaryOutput" aria-live="polite">
+            <div class="summary-empty">
+              Clique em "Gerar resumo" para montar um resumo profissional.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="signature-grid">
+        <div class="signature-line">Assinatura do Cliente</div>
+        <div class="signature-line">Vendedor</div>
+        <div class="signature-line">Técnico</div>
+      </div>
+    </section>
+
+  </div>
+
+  <section class="print-sheet" id="printSheet">
+    <div class="print-sheet__header">
+      <div class="print-sheet__brand">
+        <div class="print-badge">DF</div>
+        <div>
+          <strong>DF Pneus Michelin</strong>
+          <span>Resumo Executivo do Checklist</span>
+        </div>
+      </div>
+      <div class="print-sheet__meta" id="printSheetMeta">
+        Checklist profissional para oficina.
+      </div>
+    </div>
+
+    <div class="print-sheet__content" id="printSheetContent"></div>
+
+    <div class="print-signature-grid">
+      <div class="print-signature-line">Assinatura do Cliente</div>
+      <div class="print-signature-line">Vendedor</div>
+      <div class="print-signature-line">Técnico</div>
+    </div>
+  </section>
+
+  <div class="toast hidden-print" id="appToast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+  <script src="assets/js/checklist.js?v=7" defer></script>
+</body>
+</html>
