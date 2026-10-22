@@ -2,7 +2,7 @@
   "name": "Checklist Digital DF Pneus Michelin",
   "short_name": "Checklist DF",
   "description": "Checklist digital profissional da DF Pneus Michelin.",
-  "start_url": "./checklist_df_pneus.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f3f6fc",
   "theme_color": "#0b2345",
