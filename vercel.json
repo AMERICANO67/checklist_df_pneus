@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/",
-      "destination": "/checklist_df_pneus.html"
+      "destination": "/index.html"
     }
   ],
   "headers": [

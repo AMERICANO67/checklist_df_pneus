@@ -1,5 +1,7 @@
 const STORAGE_KEY = "df-pneus-checklist-draft-v2";
 const FIPE_BASE_URL = "https://parallelum.com.br/fipe/api/v1/carros";
+const BANNER_IMAGE_URL = "assets/images/BANNER.jpg?v=1";
+const MAX_DAMAGE_PHOTOS = 10;
 const FORM_RADIOS = [
   "Veiculo_Funcionario",
   "Garantia_Peca",
@@ -15,7 +17,7 @@ const evaluationData = [
         items: [
           "Pneu Dianteiro",
           "Pneu Traseiro",
-          "Geometria",
+          "Conserto",
           "Balanceamento",
           "Válvula",
           "Rodízio de Pneus"
@@ -26,7 +28,8 @@ const evaluationData = [
         items: [
           "Palhetas do Limpador",
           "Limpeza / Higienização Ar Cond.",
-          "Filtro Cabine"
+          "Filtro Cabine (Ar Condicionado)",
+          "Arrefecimento"
         ]
       }
     ]
@@ -55,9 +58,21 @@ const evaluationData = [
           "Cubo de Rodas (Rolamento)",
           "Rolamento de Roda",
           "Buchas",
-          "Coxim (Câmbio / Motor)",
-          "Caixa de Direção",
-          "Rodas (Tortas/Empenadas)"
+          "Coifa (Câmbio / Motor)",
+          "Caixas de Direção",
+          "Rodas (Travas/Empenadas)"
+        ]
+      },
+      {
+        name: "Família: Freio",
+        items: [
+          "Pastilhas Dianteiras",
+          "Discos de Freio",
+          "Tambor de Freio",
+          "Cilindro (Roda) / Mestre",
+          "Lonas / Sapatas Freio Traseiro",
+          "Revisão / Cabo Freio Mão",
+          "Fluído de Freio"
         ]
       },
       {
@@ -70,15 +85,28 @@ const evaluationData = [
         ]
       },
       {
-        name: "Família: Freio",
+        name: "Família: Elétrica",
         items: [
-          "Pastilhas Dianteiras",
-          "Discos de Freio",
-          "Tambor de Freio",
-          "Cilindro (Roda / Mestre)",
-          "Lonas / Sapatas Freio Traseiro",
-          "Flexível / Cabo Freio Mão",
-          "Fluído de Freio"
+          "Bateria",
+          "Lâmpadas"
+        ]
+      },
+      {
+        name: "Motor / Transmissão",
+        items: [
+          "Embreagem",
+          "Kit Correia Dentada / Poly V",
+          "Velas",
+          "Revisão"
+        ]
+      },
+      {
+        name: "Escapamento",
+        extraRows: 1,
+        items: [
+          "Sil. Traseiro",
+          "Catalisador / Tubo",
+          "Cano"
         ]
       }
     ]
@@ -87,10 +115,12 @@ const evaluationData = [
 
 const state = {
   damageEntries: [],
+  photoFiles: [],
   fipeVehicleData: null,
-  selectedDamageType: "Amassado",
   saveTimer: null,
-  toastTimer: null
+  toastTimer: null,
+  summaryVisible: true,
+  bannerPdfDataUrl: null
 };
 
 const elements = {
@@ -105,7 +135,6 @@ const elements = {
   damageList: document.getElementById("damageList"),
   photoInput: document.getElementById("damagePhotos"),
   photoPreview: document.getElementById("photoPreview"),
-  damageTypeToolbar: document.getElementById("damageTypeToolbar"),
   summaryOutput: document.getElementById("summaryOutput"),
   printSheetMeta: document.getElementById("printSheetMeta"),
   printSheetContent: document.getElementById("printSheetContent"),
@@ -115,10 +144,33 @@ const elements = {
   toast: document.getElementById("appToast"),
   addDamageBtn: document.getElementById("addDamage"),
   generateSummaryBtn: document.getElementById("generateSummaryBtn"),
+  toggleSummaryBtn: document.getElementById("toggleSummaryBtn"),
   sendEmailBtn: document.getElementById("sendEmailBtn"),
   shareChecklistBtn: document.getElementById("shareChecklistBtn"),
   printChecklistBtn: document.getElementById("printChecklistBtn")
 };
+
+function setVehicleIdentityFields({
+  brand = "",
+  model = "",
+  year = ""
+} = {}) {
+  const brandField = document.getElementById("brandDisplay");
+  const modelField = document.getElementById("modelDisplay");
+  const yearField = document.getElementById("yearDisplay");
+
+  if (brandField) {
+    brandField.value = brand;
+  }
+
+  if (modelField) {
+    modelField.value = model;
+  }
+
+  if (yearField) {
+    yearField.value = year;
+  }
+}
 
 function setStatusChip(element, message, variant = "info") {
   if (!element) {
@@ -219,6 +271,7 @@ function renderFipeVehicleDetails(vehicleData = null) {
   }
 
   if (!vehicleData) {
+    setVehicleIdentityFields();
     elements.fipeVehicleDetails.innerHTML = `
       <div class="fipe-result-empty">
         Selecione marca, modelo e ano para preencher o veículo automaticamente.
@@ -228,16 +281,16 @@ function renderFipeVehicleDetails(vehicleData = null) {
   }
 
   const detailItems = [
-    { label: "Marca", value: vehicleData.brand },
-    { label: "Modelo", value: vehicleData.model },
-    { label: "Ano", value: vehicleData.year },
-    { label: "Combustível", value: vehicleData.fuel }
+    { key: "brand", label: "Marca", value: vehicleData.brand },
+    { key: "model", label: "Modelo", value: vehicleData.model },
+    { key: "year", label: "Ano", value: vehicleData.year },
+    { key: "fuel", label: "Combustível", value: vehicleData.fuel }
   ];
 
   elements.fipeVehicleDetails.innerHTML = `
     <div class="fipe-result-grid">
       ${detailItems.map(item => `
-        <div class="fipe-result-card">
+        <div class="fipe-result-card fipe-result-card--${item.key}">
           <span>${item.label}</span>
           <strong>${item.value || "-"}</strong>
         </div>
@@ -287,6 +340,11 @@ async function loadFipeBrands(selectedValue = "") {
 
 async function loadFipeModels(brandId, selectedValue = "") {
   clearAutoFilledVehicleIfNeeded();
+  setVehicleIdentityFields({
+    brand: getSelectedText(elements.brandSelect),
+    model: "",
+    year: ""
+  });
   elements.modelSelect.disabled = true;
   elements.yearSelect.disabled = true;
   setSelectOptions(elements.modelSelect, "Carregando modelos...", [], () => "");
@@ -321,6 +379,11 @@ async function loadFipeModels(brandId, selectedValue = "") {
 
 async function loadFipeYears(brandId, modelId, selectedValue = "") {
   clearAutoFilledVehicleIfNeeded();
+  setVehicleIdentityFields({
+    brand: getSelectedText(elements.brandSelect),
+    model: getSelectedText(elements.modelSelect),
+    year: ""
+  });
   elements.yearSelect.disabled = true;
   setSelectOptions(elements.yearSelect, "Carregando anos...", [], () => "");
   state.fipeVehicleData = null;
@@ -394,6 +457,11 @@ async function syncVehicleFromFipe() {
       vehicleLabel: resolvedVehicle.trim()
     };
 
+    setVehicleIdentityFields({
+      brand: state.fipeVehicleData.brand,
+      model: state.fipeVehicleData.model,
+      year: state.fipeVehicleData.year
+    });
     renderFipeVehicleDetails(state.fipeVehicleData);
     updateSummaryOutput();
     scheduleDraftSave();
@@ -412,6 +480,11 @@ async function syncVehicleFromFipe() {
       vehicleLabel: `${brandName} ${modelName} ${selectedYearName}`.trim()
     };
 
+    setVehicleIdentityFields({
+      brand: state.fipeVehicleData.brand,
+      model: state.fipeVehicleData.model,
+      year: state.fipeVehicleData.year
+    });
     renderFipeVehicleDetails(state.fipeVehicleData);
     updateSummaryOutput();
     scheduleDraftSave();
@@ -427,101 +500,91 @@ function createStatusRow(groupKey, itemName, index) {
     .toLowerCase();
 
   return `
-    <div class="status-item">
-      <span class="status-item-title">${itemName}</span>
+    <div class="family-table__row status-item">
+      <span class="family-table__item status-item-title">${itemName}</span>
 
-      <div class="status-options">
-        <label class="status-option">
-          <input type="radio" name="${safeName}" value="Bom">
-          <span class="good">Bom</span>
-        </label>
+      <label class="family-table__choice status-option">
+        <input type="radio" name="${safeName}" value="SIM">
+        <span class="yes">Sim</span>
+      </label>
 
-        <label class="status-option">
-          <input type="radio" name="${safeName}" value="Ruim">
-          <span class="bad">Ruim</span>
-        </label>
-
-        <label class="status-option">
-          <input type="radio" name="${safeName}" value="N/A">
-          <span class="na">N/A</span>
-        </label>
-      </div>
+      <label class="family-table__choice status-option">
+        <input type="radio" name="${safeName}" value="NÃO">
+        <span class="no">Não</span>
+      </label>
     </div>
   `;
 }
 
-function splitGroupIntoCards(group) {
-  const chunkSize = group.chunkSize || group.items.length;
-
-  if (group.items.length <= chunkSize) {
-    return [{
-      ...group,
-      displayName: group.name,
-      inputKey: group.name
-    }];
-  }
-
-  const totalParts = Math.ceil(group.items.length / chunkSize);
-
-  return Array.from({ length: totalParts }, (_, index) => {
-    const start = index * chunkSize;
-    const end = start + chunkSize;
-
-    return {
-      ...group,
-      displayName: `${group.name} (${index + 1}/${totalParts})`,
-      inputKey: `${group.name}-${index + 1}`,
-      items: group.items.slice(start, end)
-    };
-  });
-}
-
-function distributeGroupsIntoColumns(groups, columnCount = 2) {
-  const columns = Array.from({ length: columnCount }, () => ({
-    groups: [],
-    weight: 0
-  }));
-
-  groups.forEach(group => {
-    const targetColumn = columns.reduce((lightest, current) => (
-      current.weight < lightest.weight ? current : lightest
-    ), columns[0]);
-
-    targetColumn.groups.push(group);
-    targetColumn.weight += group.items.length;
-  });
-
-  return columns.map(column => column.groups);
-}
-
-function renderEvaluationGroup(group) {
+function createEmptyStatusRow() {
   return `
-    <div class="evaluation-group">
-      <h3>${group.displayName || group.name}</h3>
+    <div class="family-table__row family-table__row--empty" aria-hidden="true">
+      <span class="family-table__item">&nbsp;</span>
+      <span class="family-table__choice">&nbsp;</span>
+      <span class="family-table__choice">&nbsp;</span>
+    </div>
+  `;
+}
 
-      <div class="status-list">
-        ${group.items.map((item, index) => createStatusRow(group.inputKey || group.name, item, index)).join("")}
+function renderFamilyTable(group) {
+  const extraRows = Number(group.extraRows || 0);
+
+  return `
+    <div class="family-table evaluation-group">
+      <div class="family-table__head">
+        <span class="family-table__title">${group.name}</span>
+        <span class="family-table__col-title">Sim</span>
+        <span class="family-table__col-title">Não</span>
+      </div>
+
+      <div class="family-table__body">
+        ${group.items.map((item, index) => createStatusRow(group.name, item, index)).join("")}
+        ${Array.from({ length: extraRows }, () => createEmptyStatusRow()).join("")}
       </div>
     </div>
   `;
 }
 
 function renderEvaluationSections() {
-  elements.evaluationContainer.innerHTML = evaluationData.map(section => `
-    <section class="evaluation-section">
-      <div class="section-main-title">${section.title}</div>
+  const simpleSection = evaluationData[0];
+  const completeSection = evaluationData[1];
 
-      <div class="evaluation-wrapper">
-        ${distributeGroupsIntoColumns(
-          section.groups.flatMap(splitGroupIntoCards)
-        ).map(column => `
-          <div class="evaluation-column">
-            ${column.map(renderEvaluationGroup).join("")}
-          </div>
-        `).join("")}
+  const getGroup = name => completeSection.groups.find(group => group.name === name);
+  const maxSimpleRows = Math.max(...simpleSection.groups.map(group => group.items.length));
+  const renderPaddedFamilyTable = group => renderFamilyTable({
+    ...group,
+    extraRows: Math.max(0, maxSimpleRows - group.items.length)
+  });
+
+  elements.evaluationContainer.innerHTML = `
+    <section class="evaluation-section evaluation-section--sheet">
+      <div class="section-main-title">${simpleSection.title}</div>
+      <div class="sheet-family-grid sheet-family-grid--simple">
+        ${simpleSection.groups.map(renderPaddedFamilyTable).join("")}
       </div>
     </section>
-  `).join("");
+
+    <section class="evaluation-section evaluation-section--sheet">
+      <div class="section-main-title">${completeSection.title}</div>
+
+      <div class="sheet-family-grid sheet-family-grid--complete">
+        <div class="sheet-family-stack">
+          ${renderFamilyTable(getGroup("Família: Suspensão"))}
+        </div>
+
+        <div class="sheet-family-stack">
+          ${renderFamilyTable(getGroup("Família: Freio"))}
+          ${renderFamilyTable(getGroup("Família: Lubrificante"))}
+          ${renderFamilyTable(getGroup("Família: Elétrica"))}
+        </div>
+      </div>
+
+      <div class="sheet-family-grid sheet-family-grid--footer">
+        ${renderFamilyTable(getGroup("Motor / Transmissão"))}
+        ${renderFamilyTable(getGroup("Escapamento"))}
+      </div>
+    </section>
+  `;
 }
 
 function renderDamageList() {
@@ -542,13 +605,6 @@ function renderDamageList() {
 
     title.textContent = `${item.location} - ${item.type}`;
     note.textContent = item.note || "Sem observações";
-
-    if (item.source === "map") {
-      const sourceBadge = document.createElement("span");
-      sourceBadge.className = "damage-source-badge";
-      sourceBadge.textContent = "Mapa visual";
-      description.prepend(sourceBadge);
-    }
     description.append(title, note);
 
     const removeButton = document.createElement("button");
@@ -562,73 +618,6 @@ function renderDamageList() {
   });
 }
 
-function setSelectedDamageType(type) {
-  state.selectedDamageType = type;
-
-  elements.damageTypeToolbar?.querySelectorAll("[data-damage-type]").forEach(button => {
-    button.classList.toggle("is-active", button.dataset.damageType === type);
-  });
-}
-
-function renderDamageMap() {
-  document.querySelectorAll(".damage-map-hotspot").forEach(hotspot => {
-    const mappedEntry = state.damageEntries.find(
-      item => item.source === "map" && item.location === hotspot.dataset.location
-    );
-
-    if (mappedEntry?.type) {
-      hotspot.dataset.type = mappedEntry.type;
-    } else {
-      delete hotspot.dataset.type;
-    }
-
-    hotspot.classList.toggle("is-marked", Boolean(mappedEntry));
-    hotspot.setAttribute("role", "button");
-    hotspot.setAttribute(
-      "aria-label",
-      mappedEntry
-        ? `${hotspot.dataset.location}: ${mappedEntry.type}`
-        : `${hotspot.dataset.location}: sem marcação`
-    );
-  });
-}
-
-function toggleDamageMapHotspot(location) {
-  const currentType = state.selectedDamageType || "Amassado";
-  const existingIndex = state.damageEntries.findIndex(
-    item => item.source === "map" && item.location === location
-  );
-
-  if (existingIndex >= 0) {
-    const existingItem = state.damageEntries[existingIndex];
-
-    if (existingItem.type === currentType) {
-      state.damageEntries.splice(existingIndex, 1);
-      showToast("Marcação visual removida.", "info");
-    } else {
-      state.damageEntries[existingIndex] = {
-        ...existingItem,
-        type: currentType,
-        note: "Marcado no mapa visual"
-      };
-      showToast("Tipo de avaria atualizado no mapa visual.", "success");
-    }
-  } else {
-    state.damageEntries.push({
-      location,
-      type: currentType,
-      note: "Marcado no mapa visual",
-      source: "map"
-    });
-    showToast("Ponto de avaria marcado no veículo.", "success");
-  }
-
-  renderDamageMap();
-  renderDamageList();
-  updateSummaryOutput();
-  scheduleDraftSave();
-}
-
 function addDamageEntry() {
   const location = getFieldValue("damageLocation");
   const type = getFieldValue("damageType");
@@ -639,9 +628,8 @@ function addDamageEntry() {
     return;
   }
 
-  state.damageEntries.push({ location, type, note, source: "manual" });
+  state.damageEntries.push({ location, type, note });
   renderDamageList();
-  renderDamageMap();
   updateSummaryOutput();
   scheduleDraftSave();
 
@@ -659,7 +647,6 @@ function removeDamageEntry(index) {
 
   state.damageEntries.splice(index, 1);
   renderDamageList();
-  renderDamageMap();
   updateSummaryOutput();
   scheduleDraftSave();
   showToast("Avaria removida.", "info");
@@ -668,21 +655,31 @@ function removeDamageEntry(index) {
 function previewPhotos() {
   elements.photoPreview.innerHTML = "";
 
-  Array.from(elements.photoInput.files || []).forEach(file => {
-    if (!file.type.startsWith("image/")) {
-      return;
-    }
+  if (!state.photoFiles.length) {
+    elements.photoPreview.innerHTML = `
+      <div class="preview-empty">Nenhuma foto anexada. Voce pode adicionar ate ${MAX_DAMAGE_PHOTOS} imagens.</div>
+    `;
+    return;
+  }
 
+  state.photoFiles.forEach((file, index) => {
     const card = document.createElement("div");
     card.className = "preview-card";
 
     const image = document.createElement("img");
     image.alt = file.name;
 
-    const name = document.createElement("span");
-    name.textContent = file.name;
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "preview-card__remove";
+    removeButton.dataset.removePhotoIndex = String(index);
+    removeButton.setAttribute("aria-label", `Remover foto ${file.name}`);
+    removeButton.textContent = "×";
 
-    card.append(image, name);
+    const name = document.createElement("span");
+    name.textContent = `${index + 1}. ${file.name}`;
+
+    card.append(image, removeButton, name);
     elements.photoPreview.appendChild(card);
 
     const reader = new FileReader();
@@ -693,13 +690,68 @@ function previewPhotos() {
   });
 }
 
+function syncPhotoInputFiles() {
+  if (!elements.photoInput) {
+    return;
+  }
+
+  try {
+    const dataTransfer = new DataTransfer();
+    state.photoFiles.forEach(file => dataTransfer.items.add(file));
+    elements.photoInput.files = dataTransfer.files;
+  } catch (error) {
+    console.warn("Nao foi possivel sincronizar o input de fotos:", error);
+  }
+}
+
+function addSelectedPhotos(fileList) {
+  const selectedFiles = Array.from(fileList || []).filter(file => file.type.startsWith("image/"));
+
+  if (!selectedFiles.length) {
+    previewPhotos();
+    return;
+  }
+
+  const slotsRemaining = MAX_DAMAGE_PHOTOS - state.photoFiles.length;
+
+  if (slotsRemaining <= 0) {
+    showToast(`Limite maximo de ${MAX_DAMAGE_PHOTOS} fotos atingido.`, "warning");
+    elements.photoInput.value = "";
+    return;
+  }
+
+  const filesToAdd = selectedFiles.slice(0, slotsRemaining);
+  state.photoFiles.push(...filesToAdd);
+  syncPhotoInputFiles();
+  previewPhotos();
+  elements.photoInput.value = "";
+
+  if (selectedFiles.length > filesToAdd.length) {
+    showToast(`Somente ${MAX_DAMAGE_PHOTOS} fotos sao permitidas por checklist.`, "warning");
+    return;
+  }
+
+  showToast(`${filesToAdd.length} foto(s) adicionada(s).`, "success");
+}
+
+function removeSelectedPhoto(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= state.photoFiles.length) {
+    return;
+  }
+
+  state.photoFiles.splice(index, 1);
+  syncPhotoInputFiles();
+  previewPhotos();
+  showToast("Foto removida.", "info");
+}
+
 function getMarkedIssues() {
   return Array.from(document.querySelectorAll(".status-item"))
     .map(item => {
       const title = item.querySelector(".status-item-title")?.textContent || "";
       const selected = item.querySelector('input[type="radio"]:checked');
 
-      return selected?.value === "Ruim" ? title : "";
+      return selected?.value === "NÃO" ? title : "";
     })
     .filter(Boolean);
 }
@@ -743,6 +795,8 @@ function getSummaryData() {
     plate: getFieldValue("plate") || "-",
     vehicle: getFieldValue("vehicle") || "-",
     km: getFieldValue("km") || "-",
+    lastOilService: getFieldValue("lastOilService") || "-",
+    fuelLevel: getFieldValue("fuelLevel") || "-",
     osNumber: getFieldValue("osNumber") || "-",
     sellerName: getFieldValue("sellerName") || "-",
     technicianName: getFieldValue("technicianName") || "-",
@@ -763,6 +817,7 @@ function generateSummaryText(summary = getSummaryData()) {
     `CLIENTE: ${summary.clientName} | TEL: ${summary.phone}`,
     `PLACA: ${summary.plate}`,
     `VEÍCULO: ${summary.vehicle} | KM: ${summary.km}`,
+    `ÚLTIMA TROCA DE ÓLEO: ${summary.lastOilService} | COMBUSTÍVEL: ${summary.fuelLevel}`,
     `OS: ${summary.osNumber} | VENDEDOR: ${summary.sellerName} | TÉCNICO: ${summary.technicianName}`,
     "",
     `Veículo de funcionário: ${summary.vehicleEmployee}`,
@@ -856,6 +911,8 @@ function generateSummaryMarkup(summary) {
         <div class="summary-metric"><span>Veículo</span><strong>${escapeHtml(summary.vehicle)}</strong></div>
         <div class="summary-metric"><span>Placa</span><strong>${escapeHtml(summary.plate)}</strong></div>
         <div class="summary-metric"><span>KM</span><strong>${escapeHtml(summary.km)}</strong></div>
+        <div class="summary-metric"><span>Última troca de óleo</span><strong>${escapeHtml(summary.lastOilService)}</strong></div>
+        <div class="summary-metric"><span>Combustível</span><strong>${escapeHtml(summary.fuelLevel)}</strong></div>
       </div>
 
       <div class="summary-flag-row">
@@ -925,6 +982,8 @@ function generatePrintSheetMarkup(summary) {
           <div><span>Placa</span><strong>${escapeHtml(summary.plate)}</strong></div>
           <div><span>KM</span><strong>${escapeHtml(summary.km)}</strong></div>
           <div><span>OS</span><strong>${escapeHtml(summary.osNumber)}</strong></div>
+          <div><span>Última troca de óleo</span><strong>${escapeHtml(summary.lastOilService)}</strong></div>
+          <div><span>Combustível</span><strong>${escapeHtml(summary.fuelLevel)}</strong></div>
         </div>
       </div>
 
@@ -979,6 +1038,34 @@ function updateSummaryOutput() {
 
   if (elements.printSheetContent) {
     elements.printSheetContent.innerHTML = generatePrintSheetMarkup(summary);
+  }
+}
+
+function syncSummaryVisibility() {
+  if (!elements.summaryOutput || !elements.toggleSummaryBtn) {
+    return;
+  }
+
+  const iconPath = state.summaryVisible
+    ? "M12 5c5.5 0 9.5 4.2 10.8 6.1.3.4.3 1 0 1.4C21.5 14.3 17.5 18.5 12 18.5S2.5 14.3 1.2 12.5a1.2 1.2 0 0 1 0-1.4C2.5 9.2 6.5 5 12 5Zm0 2C7.9 7 4.7 9.8 3.3 11.8 4.7 13.7 7.9 16.5 12 16.5s7.3-2.8 8.7-4.7C19.3 9.8 16.1 7 12 7Zm0 1.5a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6Zm0 2a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6Z"
+    : "m3.3 4.7 16 16-1.4 1.4-2.7-2.7a12.8 12.8 0 0 1-3.2.4c-5.5 0-9.5-4.2-10.8-6.1a1.2 1.2 0 0 1 0-1.4A19.4 19.4 0 0 1 6.1 7.3L1.9 3.1l1.4-1.4Zm4.4 4.4a3.3 3.3 0 0 0 4.6 4.6Zm3-5.1c5.5 0 9.5 4.2 10.8 6.1.3.4.3 1 0 1.4a18.2 18.2 0 0 1-4.5 4.3l-1.4-1.4a16.5 16.5 0 0 0 3-2.9c-1.4-1.9-4.6-4.7-8.7-4.7-.8 0-1.5.1-2.2.2L8.2 7.5A12.7 12.7 0 0 1 12 7.1Zm-.2 2.1a3.3 3.3 0 0 1 3.3 3.3c0 .3 0 .6-.1.9l-4.1-4.1c.3-.1.6-.1.9-.1Z";
+
+  elements.summaryOutput.hidden = !state.summaryVisible;
+  elements.toggleSummaryBtn.setAttribute("aria-expanded", String(state.summaryVisible));
+  elements.toggleSummaryBtn.setAttribute(
+    "title",
+    state.summaryVisible ? "Ocultar resumo" : "Mostrar resumo"
+  );
+
+  const text = elements.toggleSummaryBtn.querySelector(".summary-toggle__text");
+  const icon = elements.toggleSummaryBtn.querySelector(".summary-toggle__icon svg path");
+
+  if (text) {
+    text.textContent = state.summaryVisible ? "Ocultar" : "Mostrar";
+  }
+
+  if (icon) {
+    icon.setAttribute("d", iconPath);
   }
 }
 
@@ -1079,6 +1166,24 @@ async function blobToBase64(blob) {
   return window.btoa(binary);
 }
 
+async function getBannerPdfDataUrl() {
+  if (state.bannerPdfDataUrl) {
+    return state.bannerPdfDataUrl;
+  }
+
+  const response = await fetch(BANNER_IMAGE_URL);
+
+  if (!response.ok) {
+    throw new Error("Nao foi possivel carregar o banner para o PDF.");
+  }
+
+  const blob = await response.blob();
+  const base64 = await blobToBase64(blob);
+  state.bannerPdfDataUrl = `data:${blob.type || "image/jpeg"};base64,${base64}`;
+
+  return state.bannerPdfDataUrl;
+}
+
 function ensurePdfSpace(doc, cursorY, minHeight) {
   if (cursorY + minHeight <= 280) {
     return cursorY;
@@ -1150,24 +1255,39 @@ async function buildChecklistPdfBlob() {
     format: "a4"
   });
 
-  doc.setFillColor(7, 45, 98);
-  doc.roundedRect(15, 14, 180, 20, 4, 4, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  doc.text("Checklist DF Pneus Michelin", 20, 23);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10.5);
-  doc.text("Resumo executivo para atendimento, aprovacao e impressao.", 20, 29);
+  try {
+    const bannerDataUrl = await getBannerPdfDataUrl();
+    doc.addImage(bannerDataUrl, "JPEG", 15, 12, 180, 30);
+  } catch (error) {
+    console.warn("Falha ao carregar banner no PDF, usando cabecalho simplificado:", error);
+    doc.setFillColor(7, 45, 98);
+    doc.roundedRect(15, 14, 180, 20, 4, 4, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.text("Checklist DF Pneus Michelin", 20, 23);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.text("Resumo executivo para atendimento, aprovacao e impressao.", 20, 29);
+  }
 
-  let cursorY = 42;
+  doc.setDrawColor(214, 224, 238);
+  doc.setLineWidth(.5);
+  doc.line(15, 45, 195, 45);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(93, 108, 129);
+  doc.text(`${summary.clientName} · ${summary.vehicle} · ${summary.plate}`, 195, 50, { align: "right" });
+
+  let cursorY = 57;
 
   cursorY = addPdfSection(doc, "Dados do Atendimento", [
     `Loja: ${summary.storeName}`,
     `Data: ${summary.date}`,
     `Cliente: ${summary.clientName} | Telefone: ${summary.phone}`,
     `Veiculo: ${summary.vehicle}`,
-    `Placa: ${summary.plate} | KM: ${summary.km} | OS: ${summary.osNumber}`,
+    `Placa: ${summary.plate} | KM: ${summary.km} | Combustivel: ${summary.fuelLevel}`,
+    `Ultima troca de oleo: ${summary.lastOilService} | OS: ${summary.osNumber}`,
     `Vendedor: ${summary.sellerName} | Tecnico: ${summary.technicianName}`
   ], cursorY);
 
@@ -1333,7 +1453,6 @@ function getWhatsAppShareUrl(text) {
 async function shareChecklist() {
   updateSummaryOutput();
 
-  const text = generateSummaryText();
   let pdfFile = null;
 
   try {
@@ -1342,51 +1461,33 @@ async function shareChecklist() {
     console.error("Falha ao gerar PDF para compartilhamento:", error);
   }
 
-  if (navigator.share) {
+  if (pdfFile && navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
     try {
       const payload = {
         title: "Checklist DF Pneus Michelin",
-        text
+        files: [pdfFile]
       };
 
-      if (pdfFile && navigator.canShare?.({ files: [pdfFile] })) {
-        payload.files = [pdfFile];
-      }
-
       await navigator.share(payload);
-      showToast("Checklist compartilhado.", "success");
+      showToast("PDF do checklist compartilhado.", "success");
       return;
     } catch (error) {
       if (error.name === "AbortError") {
         return;
       }
 
-      console.warn("Compartilhamento indisponível:", error);
+      console.warn("Compartilhamento de PDF indisponivel:", error);
     }
   }
 
-  try {
-    await navigator.clipboard.writeText(text);
-
-    if (pdfFile) {
-      downloadBlobFile(pdfFile.name, pdfFile);
-    }
-
-    window.open(getWhatsAppShareUrl(text), "_blank", "noopener,noreferrer");
-    showToast(
-      pdfFile
-        ? "WhatsApp aberto e PDF baixado para anexo."
-        : "WhatsApp aberto com o resumo copiado.",
-      "success"
-    );
-  } catch (error) {
-    if (pdfFile) {
-      downloadBlobFile(pdfFile.name, pdfFile);
-    }
-
-    window.open(getWhatsAppShareUrl(text), "_blank", "noopener,noreferrer");
-    window.prompt("Copie o resumo abaixo:", text);
+  if (pdfFile) {
+    downloadBlobFile(pdfFile.name, pdfFile);
+    showToast("Seu navegador nao compartilha PDF direto aqui. O arquivo foi baixado.", "warning");
+    return;
   }
+
+  const text = generateSummaryText();
+  window.prompt("Nao foi possivel gerar o PDF nesta sessao. Copie o resumo abaixo:", text);
 }
 
 function setDefaultDate() {
@@ -1424,6 +1525,11 @@ function bindEvents() {
     showToast("Resumo atualizado.", "info");
   });
 
+  elements.toggleSummaryBtn?.addEventListener("click", () => {
+    state.summaryVisible = !state.summaryVisible;
+    syncSummaryVisibility();
+  });
+
   elements.sendEmailBtn.addEventListener("click", () => {
     void sendEmail();
   });
@@ -1433,15 +1539,6 @@ function bindEvents() {
     window.print();
   });
   elements.addDamageBtn.addEventListener("click", addDamageEntry);
-  elements.damageTypeToolbar?.addEventListener("click", event => {
-    const button = event.target.closest("[data-damage-type]");
-
-    if (!button) {
-      return;
-    }
-
-    setSelectedDamageType(button.dataset.damageType);
-  });
 
   elements.brandSelect.addEventListener("change", async event => {
     const brandId = event.target.value;
@@ -1472,29 +1569,19 @@ function bindEvents() {
     removeDamageEntry(Number(button.dataset.removeIndex));
   });
 
-  document.querySelector(".damage-map-canvas")?.addEventListener("click", event => {
-    const hotspot = event.target.closest(".damage-map-hotspot");
-
-    if (!hotspot) {
-      return;
-    }
-
-    toggleDamageMapHotspot(hotspot.dataset.location);
-  });
-
-  document.querySelector(".damage-map-canvas")?.addEventListener("keydown", event => {
-    const hotspot = event.target.closest(".damage-map-hotspot");
-
-    if (!hotspot || !["Enter", " "].includes(event.key)) {
-      return;
-    }
-
-    event.preventDefault();
-    toggleDamageMapHotspot(hotspot.dataset.location);
-  });
-
   elements.photoInput.addEventListener("change", () => {
-    previewPhotos();
+    addSelectedPhotos(elements.photoInput.files);
+    scheduleDraftSave();
+  });
+
+  elements.photoPreview.addEventListener("click", event => {
+    const button = event.target.closest("[data-remove-photo-index]");
+
+    if (!button) {
+      return;
+    }
+
+    removeSelectedPhoto(Number(button.dataset.removePhotoIndex));
     scheduleDraftSave();
   });
 
@@ -1522,15 +1609,15 @@ function bindEvents() {
 async function init() {
   renderEvaluationSections();
   renderDamageList();
-  renderDamageMap();
   renderFipeVehicleDetails();
+  previewPhotos();
   setDefaultDate();
   bindFormatters();
   bindEvents();
-  setSelectedDamageType(state.selectedDamageType);
   await loadFipeBrands();
   await restoreDraft();
   updateSummaryOutput();
+  syncSummaryVisibility();
 }
 
 void init();
