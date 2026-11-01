@@ -150,9 +150,12 @@ const elements = {
   evaluationContainer: document.getElementById("evaluationSections"),
   draftStatus: document.getElementById("draftStatus"),
   fipeStatus: document.getElementById("fipeStatus"),
+  storeNumber: document.getElementById("storeNumber"),
   storeCatalogSelect: document.getElementById("storeCatalogSelect"),
   sellerCatalogSelect: document.getElementById("sellerCatalogSelect"),
   technicianCatalogSelect: document.getElementById("technicianCatalogSelect"),
+  sellerCatalogName: document.getElementById("sellerCatalogName"),
+  technicianCatalogName: document.getElementById("technicianCatalogName"),
   applyStoreBtn: document.getElementById("applyStoreBtn"),
   saveStoreBtn: document.getElementById("saveStoreBtn"),
   newStoreBtn: document.getElementById("newStoreBtn"),
@@ -232,11 +235,13 @@ function createCatalogId(prefix) {
 }
 
 function getCatalogDefaults() {
+  const storeNumber = getFieldValue("storeNumber") || "01";
   const storeName = getFieldValue("storeName") || "Loja 01";
   const storeEmail = getFieldValue("storeEmail") || "";
   const storePhone = getFieldValue("storePhone") || "";
   const defaultStore = {
     id: createCatalogId("store"),
+    number: storeNumber,
     name: storeName,
     email: storeEmail,
     phone: storePhone
@@ -257,6 +262,7 @@ function sanitizeCatalogState(rawState = {}) {
   const stores = Array.isArray(rawState.stores) && rawState.stores.length
     ? rawState.stores.map(item => ({
       id: String(item.id || createCatalogId("store")),
+      number: String(item.number || "").trim(),
       name: String(item.name || "").trim(),
       email: String(item.email || "").trim(),
       phone: String(item.phone || "").trim()
@@ -315,6 +321,17 @@ function persistCatalogState() {
   }
 }
 
+function formatStoreLabel(store) {
+  const number = String(store?.number || "").trim();
+  const name = String(store?.name || "").trim();
+
+  if (number && name) {
+    return `Loja ${number} - ${name}`;
+  }
+
+  return name || number || "Loja sem identificação";
+}
+
 function populateProfileSelect(select, placeholder, items, selectedId) {
   if (!select) {
     return;
@@ -330,11 +347,63 @@ function populateProfileSelect(select, placeholder, items, selectedId) {
   items.forEach(item => {
     const option = document.createElement("option");
     option.value = item.id;
-    option.textContent = item.name;
+    option.textContent = item.number !== undefined ? formatStoreLabel(item) : item.name;
     select.appendChild(option);
   });
 
   select.value = items.some(item => item.id === selectedId) ? selectedId : "";
+}
+
+function populateFormSelect(select, placeholder, items, selectedValue = "") {
+  if (!select) {
+    return;
+  }
+
+  select.innerHTML = "";
+
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = placeholder;
+  select.appendChild(placeholderOption);
+
+  items.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.name;
+    option.textContent = item.name;
+    select.appendChild(option);
+  });
+
+  select.value = items.some(item => item.name === selectedValue) ? selectedValue : "";
+}
+
+function renderAssignedPeopleSelects() {
+  populateFormSelect(
+    document.getElementById("sellerName"),
+    "Selecione",
+    state.catalogs.sellers,
+    getFieldValue("sellerName")
+  );
+  populateFormSelect(
+    document.getElementById("technicianName"),
+    "Selecione",
+    state.catalogs.technicians,
+    getFieldValue("technicianName")
+  );
+}
+
+function syncCatalogEditorFields() {
+  const seller = state.catalogs.sellers.find(item => item.id === state.catalogs.selectedSellerId);
+  const technician = state.catalogs.technicians.find(
+    item => item.id === state.catalogs.selectedTechnicianId
+  );
+
+  if (elements.sellerCatalogName) {
+    elements.sellerCatalogName.value = seller?.name || "";
+  }
+
+  if (elements.technicianCatalogName) {
+    elements.technicianCatalogName.value = technician?.name || "";
+  }
 }
 
 function renderCatalogSelectors() {
@@ -356,6 +425,8 @@ function renderCatalogSelectors() {
     state.catalogs.technicians,
     state.catalogs.selectedTechnicianId
   );
+  syncCatalogEditorFields();
+  renderAssignedPeopleSelects();
 }
 
 function applyStoreById(storeId, options = {}) {
@@ -370,6 +441,7 @@ function applyStoreById(storeId, options = {}) {
   }
 
   state.catalogs.selectedStoreId = store.id;
+  document.getElementById("storeNumber").value = store.number || "";
   document.getElementById("storeName").value = store.name;
   document.getElementById("storeEmail").value = store.email;
   document.getElementById("storePhone").value = store.phone;
@@ -383,6 +455,7 @@ function applyStoreById(storeId, options = {}) {
 }
 
 function clearStoreFields() {
+  document.getElementById("storeNumber").value = "";
   document.getElementById("storeName").value = "";
   document.getElementById("storeEmail").value = "";
   document.getElementById("storePhone").value = "";
@@ -391,9 +464,15 @@ function clearStoreFields() {
 
 function saveCurrentStore() {
   state.catalogs.selectedStoreId = elements.storeCatalogSelect?.value || state.catalogs.selectedStoreId;
+  const number = getFieldValue("storeNumber").trim();
   const name = getFieldValue("storeName").trim();
   const email = getFieldValue("storeEmail").trim();
   const phone = getFieldValue("storePhone").trim();
+
+  if (!number) {
+    showToast("Informe o número da loja antes de salvar.", "warning");
+    return;
+  }
 
   if (!name) {
     showToast("Informe o nome da loja antes de salvar.", "warning");
@@ -409,6 +488,7 @@ function saveCurrentStore() {
   const existingIndex = state.catalogs.stores.findIndex(item => item.id === selectedId);
   const storeRecord = {
     id: existingIndex >= 0 ? state.catalogs.stores[existingIndex].id : createCatalogId("store"),
+    number,
     name,
     email,
     phone
@@ -431,7 +511,6 @@ function prepareNewStore() {
   state.catalogs.selectedStoreId = "";
   renderCatalogSelectors();
   clearStoreFields();
-  document.getElementById("storeName")?.focus();
   showToast("Preencha os dados da nova loja.", "info");
 }
 
@@ -491,7 +570,8 @@ function saveNamedProfile(type) {
   const selectedValue = isSeller
     ? elements.sellerCatalogSelect?.value
     : elements.technicianCatalogSelect?.value;
-  const name = getFieldValue(fieldId).trim();
+  const editorField = isSeller ? elements.sellerCatalogName : elements.technicianCatalogName;
+  const name = editorField?.value.trim() || "";
 
   state.catalogs[selectedKey] = selectedValue || state.catalogs[selectedKey];
 
@@ -516,19 +596,21 @@ function saveNamedProfile(type) {
   state.catalogs[selectedKey] = record.id;
   persistCatalogState();
   renderCatalogSelectors();
+  document.getElementById(fieldId).value = record.name;
   updateSummaryOutput();
   showToast(`${isSeller ? "Vendedor" : "Mecânico"} salvo no cadastro local.`, "success");
 }
 
 function prepareNewNamedProfile(type) {
   const isSeller = type === "seller";
-  const fieldId = isSeller ? "sellerName" : "technicianName";
   const selectedKey = isSeller ? "selectedSellerId" : "selectedTechnicianId";
+  const editorField = isSeller ? elements.sellerCatalogName : elements.technicianCatalogName;
 
   state.catalogs[selectedKey] = "";
   renderCatalogSelectors();
-  document.getElementById(fieldId).value = "";
-  document.getElementById(fieldId)?.focus();
+  if (editorField) {
+    editorField.value = "";
+  }
   updateSummaryOutput();
   showToast(`Digite o nome do novo ${isSeller ? "vendedor" : "mecânico"}.`, "info");
 }
@@ -538,6 +620,7 @@ function deleteNamedProfile(type) {
   const selectedKey = isSeller ? "selectedSellerId" : "selectedTechnicianId";
   const collectionKey = isSeller ? "sellers" : "technicians";
   const fieldId = isSeller ? "sellerName" : "technicianName";
+  const editorField = isSeller ? elements.sellerCatalogName : elements.technicianCatalogName;
   const label = isSeller ? "vendedor" : "mecânico";
 
   if (!state.catalogs[selectedKey]) {
@@ -550,6 +633,9 @@ function deleteNamedProfile(type) {
   );
   state.catalogs[selectedKey] = "";
   document.getElementById(fieldId).value = "";
+  if (editorField) {
+    editorField.value = "";
+  }
   persistCatalogState();
   renderCatalogSelectors();
   updateSummaryOutput();
@@ -1174,7 +1260,12 @@ function getSummaryData() {
   ].filter(Boolean);
 
   return {
+    storeNumber: getFieldValue("storeNumber") || "-",
     storeName: getFieldValue("storeName") || "-",
+    storeDisplay: formatStoreLabel({
+      number: getFieldValue("storeNumber"),
+      name: getFieldValue("storeName")
+    }) || "-",
     date: formatDateForSummary(getFieldValue("date")),
     clientName: getFieldValue("clientName") || "-",
     phone: getFieldValue("phone") || "-",
@@ -1198,7 +1289,7 @@ function getSummaryData() {
 
 function generateSummaryText(summary = getSummaryData()) {
   const lines = [
-    `LOJA: ${summary.storeName}`,
+    `LOJA: ${summary.storeDisplay}`,
     `DATA: ${summary.date}`,
     `CLIENTE: ${summary.clientName} | TEL: ${summary.phone}`,
     `PLACA: ${summary.plate}`,
@@ -1754,7 +1845,7 @@ async function buildChecklistPdfBlob() {
   let cursorY = 57;
 
   cursorY = addPdfSection(doc, "Dados do Atendimento", [
-    `Loja: ${summary.storeName}`,
+    `Loja: ${summary.storeDisplay}`,
     `Data: ${summary.date}`,
     `Cliente: ${summary.clientName} | Telefone: ${summary.phone}`,
     `Veiculo: ${summary.vehicle}`,
@@ -2045,9 +2136,11 @@ function bindEvents() {
   });
   elements.sellerCatalogSelect?.addEventListener("change", event => {
     state.catalogs.selectedSellerId = event.target.value || "";
+    syncCatalogEditorFields();
   });
   elements.technicianCatalogSelect?.addEventListener("change", event => {
     state.catalogs.selectedTechnicianId = event.target.value || "";
+    syncCatalogEditorFields();
   });
   elements.applyStoreBtn?.addEventListener("click", () => {
     applyStoreById(elements.storeCatalogSelect?.value);
