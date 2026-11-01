@@ -1125,6 +1125,10 @@
       display: none !important;
     }
 
+    #catalogsContent[hidden] {
+      display: none !important;
+    }
+
     .summary-empty {
       color: #65738a;
       font-size: 13px;

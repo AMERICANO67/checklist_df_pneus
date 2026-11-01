@@ -128,6 +128,7 @@ const state = {
   },
   saveTimer: null,
   toastTimer: null,
+  catalogsVisible: true,
   summaryVisible: true,
   bannerPdfDataUrl: null
 };
@@ -145,6 +146,7 @@ const elements = {
   photoInput: document.getElementById("damagePhotos"),
   photoPreview: document.getElementById("photoPreview"),
   summaryOutput: document.getElementById("summaryOutput"),
+  catalogsContent: document.getElementById("catalogsContent"),
   printSheetMeta: document.getElementById("printSheetMeta"),
   printSheetContent: document.getElementById("printSheetContent"),
   evaluationContainer: document.getElementById("evaluationSections"),
@@ -171,6 +173,7 @@ const elements = {
   toast: document.getElementById("appToast"),
   addDamageBtn: document.getElementById("addDamage"),
   generateSummaryBtn: document.getElementById("generateSummaryBtn"),
+  toggleCatalogsBtn: document.getElementById("toggleCatalogsBtn"),
   toggleSummaryBtn: document.getElementById("toggleSummaryBtn"),
   sendEmailBtn: document.getElementById("sendEmailBtn"),
   shareChecklistBtn: document.getElementById("shareChecklistBtn"),
@@ -1453,6 +1456,7 @@ function generatePrintSheetMarkup(summary) {
       <div class="print-block">
         <span class="print-block__title">Dados do Atendimento</span>
         <div class="print-metric-grid">
+          <div><span>Loja</span><strong>${escapeHtml(summary.storeDisplay)}</strong></div>
           <div><span>Cliente</span><strong>${escapeHtml(summary.clientName)}</strong></div>
           <div><span>Data</span><strong>${escapeHtml(summary.date)}</strong></div>
           <div><span>Veículo</span><strong>${escapeHtml(summary.vehicle)}</strong></div>
@@ -1539,6 +1543,34 @@ function syncSummaryVisibility() {
 
   if (text) {
     text.textContent = state.summaryVisible ? "Ocultar" : "Mostrar";
+  }
+
+  if (icon) {
+    icon.setAttribute("d", iconPath);
+  }
+}
+
+function syncCatalogsVisibility() {
+  if (!elements.catalogsContent || !elements.toggleCatalogsBtn) {
+    return;
+  }
+
+  const iconPath = state.catalogsVisible
+    ? "M12 5c5.5 0 9.5 4.2 10.8 6.1.3.4.3 1 0 1.4C21.5 14.3 17.5 18.5 12 18.5S2.5 14.3 1.2 12.5a1.2 1.2 0 0 1 0-1.4C2.5 9.2 6.5 5 12 5Zm0 2C7.9 7 4.7 9.8 3.3 11.8 4.7 13.7 7.9 16.5 12 16.5s7.3-2.8 8.7-4.7C19.3 9.8 16.1 7 12 7Zm0 1.5a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 0 1 0-6.6Zm0 2a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6Z"
+    : "m3.3 4.7 16 16-1.4 1.4-2.7-2.7a12.8 12.8 0 0 1-3.2.4c-5.5 0-9.5-4.2-10.8-6.1a1.2 1.2 0 0 1 0-1.4A19.4 19.4 0 0 1 6.1 7.3L1.9 3.1l1.4-1.4Zm4.4 4.4a3.3 3.3 0 0 0 4.6 4.6Zm3-5.1c5.5 0 9.5 4.2 10.8 6.1.3.4.3 1 0 1.4a18.2 18.2 0 0 1-4.5 4.3l-1.4-1.4a16.5 16.5 0 0 0 3-2.9c-1.4-1.9-4.6-4.7-8.7-4.7-.8 0-1.5.1-2.2.2L8.2 7.5A12.7 12.7 0 0 1 12 7.1Zm-.2 2.1a3.3 3.3 0 0 1 3.3 3.3c0 .3 0 .6-.1.9l-4.1-4.1c.3-.1.6-.1.9-.1Z";
+
+  elements.catalogsContent.hidden = !state.catalogsVisible;
+  elements.toggleCatalogsBtn.setAttribute("aria-expanded", String(state.catalogsVisible));
+  elements.toggleCatalogsBtn.setAttribute(
+    "title",
+    state.catalogsVisible ? "Ocultar cadastros rápidos" : "Mostrar cadastros rápidos"
+  );
+
+  const text = elements.toggleCatalogsBtn.querySelector(".summary-toggle__text");
+  const icon = elements.toggleCatalogsBtn.querySelector(".summary-toggle__icon svg path");
+
+  if (text) {
+    text.textContent = state.catalogsVisible ? "Ocultar" : "Mostrar";
   }
 
   if (icon) {
@@ -2137,6 +2169,11 @@ function bindEvents() {
     syncSummaryVisibility();
   });
 
+  elements.toggleCatalogsBtn?.addEventListener("click", () => {
+    state.catalogsVisible = !state.catalogsVisible;
+    syncCatalogsVisibility();
+  });
+
   elements.sendEmailBtn.addEventListener("click", () => {
     void sendEmail();
   });
@@ -2272,6 +2309,7 @@ async function init() {
   await loadFipeBrands();
   await restoreDraft();
   updateSummaryOutput();
+  syncCatalogsVisibility();
   syncSummaryVisibility();
 }
 
