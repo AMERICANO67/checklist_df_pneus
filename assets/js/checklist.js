@@ -1,4 +1,5 @@
 const STORAGE_KEY = "df-pneus-checklist-draft-v2";
+const CATALOGS_STORAGE_KEY = "df-pneus-checklist-catalogs-v1";
 const FIPE_BASE_URL = "https://parallelum.com.br/fipe/api/v1/carros";
 const BANNER_IMAGE_URL = "assets/images/BANNER.jpg?v=1";
 const MAX_DAMAGE_PHOTOS = 10;
@@ -117,6 +118,14 @@ const state = {
   damageEntries: [],
   photoFiles: [],
   fipeVehicleData: null,
+  catalogs: {
+    stores: [],
+    sellers: [],
+    technicians: [],
+    selectedStoreId: "",
+    selectedSellerId: "",
+    selectedTechnicianId: ""
+  },
   saveTimer: null,
   toastTimer: null,
   summaryVisible: true,
@@ -141,6 +150,21 @@ const elements = {
   evaluationContainer: document.getElementById("evaluationSections"),
   draftStatus: document.getElementById("draftStatus"),
   fipeStatus: document.getElementById("fipeStatus"),
+  storeCatalogSelect: document.getElementById("storeCatalogSelect"),
+  sellerCatalogSelect: document.getElementById("sellerCatalogSelect"),
+  technicianCatalogSelect: document.getElementById("technicianCatalogSelect"),
+  applyStoreBtn: document.getElementById("applyStoreBtn"),
+  saveStoreBtn: document.getElementById("saveStoreBtn"),
+  newStoreBtn: document.getElementById("newStoreBtn"),
+  deleteStoreBtn: document.getElementById("deleteStoreBtn"),
+  applySellerBtn: document.getElementById("applySellerBtn"),
+  saveSellerBtn: document.getElementById("saveSellerBtn"),
+  newSellerBtn: document.getElementById("newSellerBtn"),
+  deleteSellerBtn: document.getElementById("deleteSellerBtn"),
+  applyTechnicianBtn: document.getElementById("applyTechnicianBtn"),
+  saveTechnicianBtn: document.getElementById("saveTechnicianBtn"),
+  newTechnicianBtn: document.getElementById("newTechnicianBtn"),
+  deleteTechnicianBtn: document.getElementById("deleteTechnicianBtn"),
   toast: document.getElementById("appToast"),
   addDamageBtn: document.getElementById("addDamage"),
   generateSummaryBtn: document.getElementById("generateSummaryBtn"),
@@ -149,6 +173,14 @@ const elements = {
   shareChecklistBtn: document.getElementById("shareChecklistBtn"),
   printChecklistBtn: document.getElementById("printChecklistBtn")
 };
+
+function makeSafeKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .toLowerCase();
+}
 
 function setVehicleIdentityFields({
   brand = "",
@@ -193,6 +225,335 @@ function showToast(message, variant = "info") {
   state.toastTimer = window.setTimeout(() => {
     elements.toast.className = "toast hidden-print";
   }, 3000);
+}
+
+function createCatalogId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getCatalogDefaults() {
+  const storeName = getFieldValue("storeName") || "Loja 01";
+  const storeEmail = getFieldValue("storeEmail") || "";
+  const storePhone = getFieldValue("storePhone") || "";
+  const defaultStore = {
+    id: createCatalogId("store"),
+    name: storeName,
+    email: storeEmail,
+    phone: storePhone
+  };
+
+  return {
+    stores: [defaultStore],
+    sellers: [],
+    technicians: [],
+    selectedStoreId: defaultStore.id,
+    selectedSellerId: "",
+    selectedTechnicianId: ""
+  };
+}
+
+function sanitizeCatalogState(rawState = {}) {
+  const defaults = getCatalogDefaults();
+  const stores = Array.isArray(rawState.stores) && rawState.stores.length
+    ? rawState.stores.map(item => ({
+      id: String(item.id || createCatalogId("store")),
+      name: String(item.name || "").trim(),
+      email: String(item.email || "").trim(),
+      phone: String(item.phone || "").trim()
+    })).filter(item => item.name)
+    : defaults.stores;
+
+  const sellers = Array.isArray(rawState.sellers)
+    ? rawState.sellers.map(item => ({
+      id: String(item.id || createCatalogId("seller")),
+      name: String(item.name || "").trim()
+    })).filter(item => item.name)
+    : [];
+
+  const technicians = Array.isArray(rawState.technicians)
+    ? rawState.technicians.map(item => ({
+      id: String(item.id || createCatalogId("technician")),
+      name: String(item.name || "").trim()
+    })).filter(item => item.name)
+    : [];
+
+  const selectedStoreId = stores.some(item => item.id === rawState.selectedStoreId)
+    ? rawState.selectedStoreId
+    : stores[0]?.id || "";
+  const selectedSellerId = sellers.some(item => item.id === rawState.selectedSellerId)
+    ? rawState.selectedSellerId
+    : "";
+  const selectedTechnicianId = technicians.some(item => item.id === rawState.selectedTechnicianId)
+    ? rawState.selectedTechnicianId
+    : "";
+
+  return {
+    stores,
+    sellers,
+    technicians,
+    selectedStoreId,
+    selectedSellerId,
+    selectedTechnicianId
+  };
+}
+
+function loadCatalogState() {
+  try {
+    const stored = window.localStorage.getItem(CATALOGS_STORAGE_KEY);
+    state.catalogs = sanitizeCatalogState(stored ? JSON.parse(stored) : {});
+  } catch (error) {
+    console.warn("Falha ao carregar cadastros locais:", error);
+    state.catalogs = getCatalogDefaults();
+  }
+}
+
+function persistCatalogState() {
+  try {
+    window.localStorage.setItem(CATALOGS_STORAGE_KEY, JSON.stringify(state.catalogs));
+  } catch (error) {
+    console.warn("Falha ao salvar cadastros locais:", error);
+  }
+}
+
+function populateProfileSelect(select, placeholder, items, selectedId) {
+  if (!select) {
+    return;
+  }
+
+  select.innerHTML = "";
+
+  const placeholderOption = document.createElement("option");
+  placeholderOption.value = "";
+  placeholderOption.textContent = placeholder;
+  select.appendChild(placeholderOption);
+
+  items.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = item.name;
+    select.appendChild(option);
+  });
+
+  select.value = items.some(item => item.id === selectedId) ? selectedId : "";
+}
+
+function renderCatalogSelectors() {
+  populateProfileSelect(
+    elements.storeCatalogSelect,
+    "Nova loja",
+    state.catalogs.stores,
+    state.catalogs.selectedStoreId
+  );
+  populateProfileSelect(
+    elements.sellerCatalogSelect,
+    "Novo vendedor",
+    state.catalogs.sellers,
+    state.catalogs.selectedSellerId
+  );
+  populateProfileSelect(
+    elements.technicianCatalogSelect,
+    "Novo mecânico",
+    state.catalogs.technicians,
+    state.catalogs.selectedTechnicianId
+  );
+}
+
+function applyStoreById(storeId, options = {}) {
+  const { silent = false } = options;
+  const store = state.catalogs.stores.find(item => item.id === storeId);
+
+  if (!store) {
+    if (!silent) {
+      showToast("Selecione uma loja cadastrada para aplicar.", "warning");
+    }
+    return;
+  }
+
+  state.catalogs.selectedStoreId = store.id;
+  document.getElementById("storeName").value = store.name;
+  document.getElementById("storeEmail").value = store.email;
+  document.getElementById("storePhone").value = store.phone;
+  persistCatalogState();
+  renderCatalogSelectors();
+  updateSummaryOutput();
+
+  if (!silent) {
+    showToast("Loja aplicada no checklist.", "success");
+  }
+}
+
+function clearStoreFields() {
+  document.getElementById("storeName").value = "";
+  document.getElementById("storeEmail").value = "";
+  document.getElementById("storePhone").value = "";
+  updateSummaryOutput();
+}
+
+function saveCurrentStore() {
+  state.catalogs.selectedStoreId = elements.storeCatalogSelect?.value || state.catalogs.selectedStoreId;
+  const name = getFieldValue("storeName").trim();
+  const email = getFieldValue("storeEmail").trim();
+  const phone = getFieldValue("storePhone").trim();
+
+  if (!name) {
+    showToast("Informe o nome da loja antes de salvar.", "warning");
+    return;
+  }
+
+  if (email && !isValidEmail(email)) {
+    showToast("Informe um e-mail válido para a loja.", "warning");
+    return;
+  }
+
+  const selectedId = state.catalogs.selectedStoreId;
+  const existingIndex = state.catalogs.stores.findIndex(item => item.id === selectedId);
+  const storeRecord = {
+    id: existingIndex >= 0 ? state.catalogs.stores[existingIndex].id : createCatalogId("store"),
+    name,
+    email,
+    phone
+  };
+
+  if (existingIndex >= 0) {
+    state.catalogs.stores[existingIndex] = storeRecord;
+  } else {
+    state.catalogs.stores.push(storeRecord);
+  }
+
+  state.catalogs.selectedStoreId = storeRecord.id;
+  persistCatalogState();
+  renderCatalogSelectors();
+  updateSummaryOutput();
+  showToast("Loja salva no cadastro local.", "success");
+}
+
+function prepareNewStore() {
+  state.catalogs.selectedStoreId = "";
+  renderCatalogSelectors();
+  clearStoreFields();
+  document.getElementById("storeName")?.focus();
+  showToast("Preencha os dados da nova loja.", "info");
+}
+
+function deleteCurrentStore() {
+  if (!state.catalogs.selectedStoreId) {
+    showToast("Selecione uma loja cadastrada para excluir.", "warning");
+    return;
+  }
+
+  state.catalogs.stores = state.catalogs.stores.filter(
+    item => item.id !== state.catalogs.selectedStoreId
+  );
+
+  if (!state.catalogs.stores.length) {
+    clearStoreFields();
+    const defaults = getCatalogDefaults();
+    state.catalogs.stores = defaults.stores;
+    state.catalogs.selectedStoreId = defaults.selectedStoreId;
+  } else {
+    state.catalogs.selectedStoreId = state.catalogs.stores[0].id;
+  }
+
+  persistCatalogState();
+  renderCatalogSelectors();
+  applyStoreById(state.catalogs.selectedStoreId, { silent: true });
+  showToast("Loja excluída do cadastro local.", "info");
+}
+
+function applyNamedProfile(type) {
+  const isSeller = type === "seller";
+  const collection = isSeller ? state.catalogs.sellers : state.catalogs.technicians;
+  const selectedId = isSeller
+    ? state.catalogs.selectedSellerId
+    : state.catalogs.selectedTechnicianId;
+  const fieldId = isSeller ? "sellerName" : "technicianName";
+  const label = isSeller ? "vendedor" : "mecânico";
+  const profile = collection.find(item => item.id === selectedId);
+
+  if (!profile) {
+    showToast(`Selecione um ${label} cadastrado para aplicar.`, "warning");
+    return;
+  }
+
+  document.getElementById(fieldId).value = profile.name;
+  persistCatalogState();
+  updateSummaryOutput();
+  showToast(`${isSeller ? "Vendedor" : "Mecânico"} aplicado no checklist.`, "success");
+}
+
+function saveNamedProfile(type) {
+  const isSeller = type === "seller";
+  const fieldId = isSeller ? "sellerName" : "technicianName";
+  const selectedKey = isSeller ? "selectedSellerId" : "selectedTechnicianId";
+  const collectionKey = isSeller ? "sellers" : "technicians";
+  const prefix = isSeller ? "seller" : "technician";
+  const label = isSeller ? "vendedor" : "mecânico";
+  const selectedValue = isSeller
+    ? elements.sellerCatalogSelect?.value
+    : elements.technicianCatalogSelect?.value;
+  const name = getFieldValue(fieldId).trim();
+
+  state.catalogs[selectedKey] = selectedValue || state.catalogs[selectedKey];
+
+  if (!name) {
+    showToast(`Informe o nome do ${label} antes de salvar.`, "warning");
+    return;
+  }
+
+  const selectedId = state.catalogs[selectedKey];
+  const existingIndex = state.catalogs[collectionKey].findIndex(item => item.id === selectedId);
+  const record = {
+    id: existingIndex >= 0 ? state.catalogs[collectionKey][existingIndex].id : createCatalogId(prefix),
+    name
+  };
+
+  if (existingIndex >= 0) {
+    state.catalogs[collectionKey][existingIndex] = record;
+  } else {
+    state.catalogs[collectionKey].push(record);
+  }
+
+  state.catalogs[selectedKey] = record.id;
+  persistCatalogState();
+  renderCatalogSelectors();
+  updateSummaryOutput();
+  showToast(`${isSeller ? "Vendedor" : "Mecânico"} salvo no cadastro local.`, "success");
+}
+
+function prepareNewNamedProfile(type) {
+  const isSeller = type === "seller";
+  const fieldId = isSeller ? "sellerName" : "technicianName";
+  const selectedKey = isSeller ? "selectedSellerId" : "selectedTechnicianId";
+
+  state.catalogs[selectedKey] = "";
+  renderCatalogSelectors();
+  document.getElementById(fieldId).value = "";
+  document.getElementById(fieldId)?.focus();
+  updateSummaryOutput();
+  showToast(`Digite o nome do novo ${isSeller ? "vendedor" : "mecânico"}.`, "info");
+}
+
+function deleteNamedProfile(type) {
+  const isSeller = type === "seller";
+  const selectedKey = isSeller ? "selectedSellerId" : "selectedTechnicianId";
+  const collectionKey = isSeller ? "sellers" : "technicians";
+  const fieldId = isSeller ? "sellerName" : "technicianName";
+  const label = isSeller ? "vendedor" : "mecânico";
+
+  if (!state.catalogs[selectedKey]) {
+    showToast(`Selecione um ${label} cadastrado para excluir.`, "warning");
+    return;
+  }
+
+  state.catalogs[collectionKey] = state.catalogs[collectionKey].filter(
+    item => item.id !== state.catalogs[selectedKey]
+  );
+  state.catalogs[selectedKey] = "";
+  document.getElementById(fieldId).value = "";
+  persistCatalogState();
+  renderCatalogSelectors();
+  updateSummaryOutput();
+  showToast(`${isSeller ? "Vendedor" : "Mecânico"} excluído do cadastro local.`, "info");
 }
 
 function formatPhone(value) {
@@ -493,23 +854,20 @@ async function syncVehicleFromFipe() {
 }
 
 function createStatusRow(groupKey, itemName, index) {
-  const safeName = `${groupKey}-${index}`
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9_-]/g, "-")
-    .toLowerCase();
+  const safeGroupKey = makeSafeKey(groupKey);
+  const safeName = `${safeGroupKey}-${index}`;
 
   return `
     <div class="family-table__row status-item">
       <span class="family-table__item status-item-title">${itemName}</span>
 
       <label class="family-table__choice status-option">
-        <input type="radio" name="${safeName}" value="SIM">
+        <input type="radio" name="${safeName}" value="SIM" data-family-key="${safeGroupKey}">
         <span class="yes">Sim</span>
       </label>
 
       <label class="family-table__choice status-option">
-        <input type="radio" name="${safeName}" value="NÃO">
+        <input type="radio" name="${safeName}" value="NÃO" data-family-key="${safeGroupKey}">
         <span class="no">Não</span>
       </label>
     </div>
@@ -528,11 +886,21 @@ function createEmptyStatusRow() {
 
 function renderFamilyTable(group) {
   const extraRows = Number(group.extraRows || 0);
+  const familyKey = makeSafeKey(group.name);
 
   return `
     <div class="family-table evaluation-group">
       <div class="family-table__head">
-        <span class="family-table__title">${group.name}</span>
+        <span class="family-table__title">
+          <span class="family-table__title-text">${group.name}</span>
+          <button
+            type="button"
+            class="family-table__bulk hidden-print"
+            data-mark-family="${familyKey}"
+          >
+            Tudo Sim
+          </button>
+        </span>
         <span class="family-table__col-title">Sim</span>
         <span class="family-table__col-title">Não</span>
       </div>
@@ -743,6 +1111,24 @@ function removeSelectedPhoto(index) {
   syncPhotoInputFiles();
   previewPhotos();
   showToast("Foto removida.", "info");
+}
+
+function markFamilyAsYes(familyKey) {
+  const yesRadios = Array.from(
+    document.querySelectorAll(`input[type="radio"][data-family-key="${familyKey}"][value="SIM"]`)
+  );
+
+  if (!yesRadios.length) {
+    return;
+  }
+
+  yesRadios.forEach(input => {
+    input.checked = true;
+  });
+
+  updateSummaryOutput();
+  scheduleDraftSave();
+  showToast("Todos os itens da família foram marcados como Sim.", "success");
 }
 
 function getMarkedIssues() {
@@ -1084,7 +1470,7 @@ function collectCheckedValues(selector) {
 }
 
 function saveDraft() {
-  setStatusChip(elements.draftStatus, "Checklist pronto", "success");
+  setStatusChip(elements.draftStatus, "Checklist pronto para iniciar", "success");
 }
 
 function scheduleDraftSave() {
@@ -1103,7 +1489,7 @@ function restoreCheckedValues(values) {
 }
 
 async function restoreDraft() {
-  setStatusChip(elements.draftStatus, "Checklist pronto", "success");
+  setStatusChip(elements.draftStatus, "Checklist pronto para iniciar", "success");
 }
 
 function isValidEmail(value) {
@@ -1164,6 +1550,92 @@ async function blobToBase64(blob) {
   });
 
   return window.btoa(binary);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = event => resolve(event.target?.result || "");
+    reader.onerror = () => reject(new Error(`Falha ao ler o arquivo ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function dataUrlToImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Falha ao preparar a imagem para o e-mail."));
+    image.src = dataUrl;
+  });
+}
+
+function canvasToBlob(canvas, mimeType, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob) {
+        reject(new Error("Falha ao compactar a imagem para o e-mail."));
+        return;
+      }
+
+      resolve(blob);
+    }, mimeType, quality);
+  });
+}
+
+async function optimizeImageForEmail(file) {
+  const maxDimension = 1600;
+  const maxOriginalSize = 1_800_000;
+
+  if (!file.type.startsWith("image/") || file.size <= maxOriginalSize) {
+    return file;
+  }
+
+  try {
+    const dataUrl = await readFileAsDataUrl(file);
+    const image = await dataUrlToImage(dataUrl);
+    const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement("canvas");
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      return file;
+    }
+
+    context.drawImage(image, 0, 0, width, height);
+
+    const optimizedBlob = await canvasToBlob(canvas, "image/jpeg", 0.82);
+    const optimizedName = file.name.replace(/\.[^.]+$/, "") || `foto-${Date.now()}`;
+
+    return new File(
+      [optimizedBlob],
+      `${optimizedName}.jpg`,
+      { type: "image/jpeg" }
+    );
+  } catch (error) {
+    console.warn("Falha ao otimizar a imagem para envio, usando original:", error);
+    return file;
+  }
+}
+
+async function buildPhotoEmailAttachments() {
+  const attachments = [];
+
+  for (const file of state.photoFiles) {
+    const preparedFile = await optimizeImageForEmail(file);
+    attachments.push({
+      filename: preparedFile.name,
+      content: await blobToBase64(preparedFile)
+    });
+  }
+
+  return attachments;
 }
 
 async function getBannerPdfDataUrl() {
@@ -1331,7 +1803,8 @@ async function sendChecklistEmailViaApi({
   toEmail,
   subject,
   bodyText,
-  pdfFile
+  pdfFile,
+  photoAttachments = []
 }) {
   const pdfBase64 = await blobToBase64(pdfFile);
   const response = await fetch("/api/send-checklist-email", {
@@ -1344,7 +1817,8 @@ async function sendChecklistEmailViaApi({
       subject,
       bodyText,
       pdfFilename: pdfFile.name,
-      pdfBase64
+      pdfBase64,
+      photoAttachments
     })
   });
 
@@ -1373,15 +1847,17 @@ async function copyTextToClipboard(text) {
 
 function generateEmailBody() {
   const summary = getSummaryData();
+  const attachmentLine = state.photoFiles.length
+    ? `O PDF e ${state.photoFiles.length} foto(s) seguem anexados neste envio.`
+    : "O PDF do checklist segue anexado neste envio.";
 
   return [
     "Checklist DF Pneus Michelin",
     "==========================",
     "",
-    generateSummaryText(summary),
+    attachmentLine,
     "",
-    "Observação: o PDF do checklist é baixado no computador para ser anexado manualmente no e-mail.",
-    "Fotos e anexos também precisam ser incluídos manualmente."
+    generateSummaryText(summary),
   ].join("\n");
 }
 
@@ -1400,11 +1876,18 @@ async function sendEmail() {
 
   const bodyText = generateEmailBody();
   let pdfFile = null;
+  let photoAttachments = [];
 
   try {
     pdfFile = await buildChecklistPdfFile();
   } catch (error) {
     console.error("Falha ao gerar PDF para envio:", error);
+  }
+
+  try {
+    photoAttachments = await buildPhotoEmailAttachments();
+  } catch (error) {
+    console.error("Falha ao preparar fotos para envio:", error);
   }
 
   if (pdfFile) {
@@ -1413,10 +1896,15 @@ async function sendEmail() {
         toEmail: email,
         subject: subjectText,
         bodyText,
-        pdfFile
+        pdfFile,
+        photoAttachments
       });
 
-      showToast("E-mail enviado com PDF anexado pela Vercel.", "success");
+      const attachmentsInfo = photoAttachments.length
+        ? ` e ${photoAttachments.length} foto(s)`
+        : "";
+
+      showToast(`E-mail enviado com PDF anexado${attachmentsInfo} pela Vercel.`, "success");
       return;
     } catch (error) {
       console.warn("Envio serverless indisponível, usando fallback local:", error);
@@ -1434,7 +1922,10 @@ async function sendEmail() {
   window.location.assign(`mailto:${email}?subject=${subject}&body=${encodedBody}`);
 
   if (pdfFile) {
-    showToast("API indisponível aqui. O e-mail abriu e o PDF foi baixado para anexo manual.", "warning");
+    const photoMessage = state.photoFiles.length
+      ? " As fotos precisam ser anexadas manualmente neste fallback."
+      : "";
+    showToast(`API indisponível aqui. O e-mail abriu e o PDF foi baixado para anexo manual.${photoMessage}`, "warning");
     return;
   }
 
@@ -1525,6 +2016,16 @@ function bindEvents() {
     showToast("Resumo atualizado.", "info");
   });
 
+  elements.evaluationContainer?.addEventListener("click", event => {
+    const button = event.target.closest("[data-mark-family]");
+
+    if (!button) {
+      return;
+    }
+
+    markFamilyAsYes(button.dataset.markFamily);
+  });
+
   elements.toggleSummaryBtn?.addEventListener("click", () => {
     state.summaryVisible = !state.summaryVisible;
     syncSummaryVisibility();
@@ -1539,6 +2040,49 @@ function bindEvents() {
     window.print();
   });
   elements.addDamageBtn.addEventListener("click", addDamageEntry);
+  elements.storeCatalogSelect?.addEventListener("change", event => {
+    state.catalogs.selectedStoreId = event.target.value || "";
+  });
+  elements.sellerCatalogSelect?.addEventListener("change", event => {
+    state.catalogs.selectedSellerId = event.target.value || "";
+  });
+  elements.technicianCatalogSelect?.addEventListener("change", event => {
+    state.catalogs.selectedTechnicianId = event.target.value || "";
+  });
+  elements.applyStoreBtn?.addEventListener("click", () => {
+    applyStoreById(elements.storeCatalogSelect?.value);
+  });
+  elements.saveStoreBtn?.addEventListener("click", saveCurrentStore);
+  elements.newStoreBtn?.addEventListener("click", prepareNewStore);
+  elements.deleteStoreBtn?.addEventListener("click", deleteCurrentStore);
+  elements.applySellerBtn?.addEventListener("click", () => {
+    state.catalogs.selectedSellerId = elements.sellerCatalogSelect?.value || "";
+    applyNamedProfile("seller");
+  });
+  elements.saveSellerBtn?.addEventListener("click", () => {
+    saveNamedProfile("seller");
+  });
+  elements.newSellerBtn?.addEventListener("click", () => {
+    prepareNewNamedProfile("seller");
+  });
+  elements.deleteSellerBtn?.addEventListener("click", () => {
+    state.catalogs.selectedSellerId = elements.sellerCatalogSelect?.value || "";
+    deleteNamedProfile("seller");
+  });
+  elements.applyTechnicianBtn?.addEventListener("click", () => {
+    state.catalogs.selectedTechnicianId = elements.technicianCatalogSelect?.value || "";
+    applyNamedProfile("technician");
+  });
+  elements.saveTechnicianBtn?.addEventListener("click", () => {
+    saveNamedProfile("technician");
+  });
+  elements.newTechnicianBtn?.addEventListener("click", () => {
+    prepareNewNamedProfile("technician");
+  });
+  elements.deleteTechnicianBtn?.addEventListener("click", () => {
+    state.catalogs.selectedTechnicianId = elements.technicianCatalogSelect?.value || "";
+    deleteNamedProfile("technician");
+  });
 
   elements.brandSelect.addEventListener("change", async event => {
     const brandId = event.target.value;
@@ -1607,6 +2151,9 @@ function bindEvents() {
 }
 
 async function init() {
+  loadCatalogState();
+  renderCatalogSelectors();
+  applyStoreById(state.catalogs.selectedStoreId, { silent: true });
   renderEvaluationSections();
   renderDamageList();
   renderFipeVehicleDetails();

@@ -76,7 +76,8 @@ module.exports = async (req, res) => {
       subject,
       bodyText,
       pdfBase64,
-      pdfFilename
+      pdfFilename,
+      photoAttachments = []
     } = payload || {};
 
     if (!toEmail || !subject || !bodyText || !pdfBase64 || !pdfFilename) {
@@ -103,7 +104,13 @@ module.exports = async (req, res) => {
           {
             filename: pdfFilename,
             content: pdfBase64
-          }
+          },
+          ...photoAttachments
+            .filter(item => item?.filename && item?.content)
+            .map(item => ({
+              filename: item.filename,
+              content: item.content
+            }))
         ]
       })
     });

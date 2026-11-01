@@ -159,6 +159,53 @@
       min-width: 0;
     }
 
+    .catalog-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .catalog-card {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid rgba(11, 78, 162, .12);
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at top right, rgba(246, 196, 0, .08), transparent 30%),
+        linear-gradient(180deg, #ffffff, #f8fbff);
+    }
+
+    .catalog-card__head {
+      display: grid;
+      gap: 4px;
+    }
+
+    .catalog-card__head h3 {
+      margin: 0;
+      font-size: 16px;
+      color: var(--azul-escuro);
+    }
+
+    .catalog-card__head p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #5a6880;
+    }
+
+    .catalog-card__actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .catalog-card__actions button {
+      min-width: 0;
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+
     .site-footer {
       width: min(100% - 32px, 1380px);
       margin: 0 auto 18px;
@@ -707,6 +754,36 @@
     .family-table__item {
       padding: 7px 10px;
       border-right: 1px solid #9aa9bd;
+    }
+
+    .family-table__title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .family-table__title-text {
+      min-width: 0;
+    }
+
+    .family-table__bulk {
+      flex: 0 0 auto;
+      min-height: 24px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, .26);
+      background: rgba(255, 255, 255, .14);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      box-shadow: none;
+    }
+
+    .family-table__bulk:hover {
+      background: rgba(255, 255, 255, .24);
+      transform: none;
     }
 
     .family-table__col-title,
@@ -1345,6 +1422,10 @@
     /* TABLETS */
 
     @media (max-width: 900px) {
+      .catalog-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
       .grid-4 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
@@ -1369,6 +1450,7 @@
     /* RESPONSIVIDADE: TABLETS PEQUENOS */
 
     @media (max-width: 768px) {
+      .catalog-grid,
       .summary-layout,
       .sheet-family-grid--complete {
         grid-template-columns: minmax(0, 1fr);
@@ -1534,6 +1616,14 @@
         grid-template-columns: minmax(0, 1fr) 62px 62px;
       }
 
+      .family-table__title {
+        flex-wrap: wrap;
+      }
+
+      .family-table__bulk {
+        width: 100%;
+      }
+
       .damage-form-grid {
         grid-template-columns: minmax(0, 1fr);
       }
@@ -1586,10 +1676,14 @@
 
       .status-chip {
         justify-content: center;
-        flex: 1 1 calc(50% - 8px);
+        flex: 1 1 100%;
         min-width: 0;
         text-align: center;
         padding: 8px 10px;
+      }
+
+      .catalog-card__actions {
+        grid-template-columns: minmax(0, 1fr);
       }
     }
 
@@ -1598,11 +1692,13 @@
       flex-wrap: wrap;
       gap: 8px;
       align-items: center;
+      justify-content: center;
     }
 
     .status-chip {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       min-height: 34px;
       padding: 7px 12px;
       border-radius: 999px;
@@ -1635,6 +1731,11 @@
       background: #fdecef;
       border-color: #f3bec9;
       color: #a11632;
+    }
+
+    .status-chip:only-child {
+      min-width: min(100%, 260px);
+      text-align: center;
     }
 
     .section-gap-top {
