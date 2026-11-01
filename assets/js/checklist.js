@@ -14,7 +14,7 @@ const evaluationData = [
     title: "Avaliação Veicular - Simples (Vendedor)",
     groups: [
       {
-        name: "Família: Pneu",
+        name: "Família: Pneus",
         items: [
           "Pneu Dianteiro",
           "Pneu Traseiro",
@@ -1936,11 +1936,20 @@ async function copyTextToClipboard(text) {
   }
 }
 
-function generateEmailBody() {
+function generateEmailBody(options = {}) {
+  const { includeAttachments = true } = options;
   const summary = getSummaryData();
-  const attachmentLine = state.photoFiles.length
-    ? `O PDF e ${state.photoFiles.length} foto(s) seguem anexados neste envio.`
-    : "O PDF do checklist segue anexado neste envio.";
+  const attachmentLine = includeAttachments
+    ? (
+      state.photoFiles.length
+        ? `O PDF e ${state.photoFiles.length} foto(s) seguem anexados neste envio.`
+        : "O PDF do checklist segue anexado neste envio."
+    )
+    : (
+      state.photoFiles.length
+        ? `Neste fallback local, o PDF e as ${state.photoFiles.length} foto(s) precisam ser anexados manualmente.`
+        : "Neste fallback local, o PDF precisa ser anexado manualmente."
+    );
 
   return [
     "Checklist DF Pneus Michelin",
@@ -1965,9 +1974,11 @@ async function sendEmail() {
   const subjectText =
     `Checklist - ${getFieldValue("plate") || "sem-placa"} - ${getFieldValue("clientName") || "cliente"}`;
 
-  const bodyText = generateEmailBody();
+  const apiBodyText = generateEmailBody({ includeAttachments: true });
+  const fallbackBodyText = generateEmailBody({ includeAttachments: false });
   let pdfFile = null;
   let photoAttachments = [];
+  let apiErrorMessage = "";
 
   try {
     pdfFile = await buildChecklistPdfFile();
@@ -1986,7 +1997,7 @@ async function sendEmail() {
       await sendChecklistEmailViaApi({
         toEmail: email,
         subject: subjectText,
-        bodyText,
+        bodyText: apiBodyText,
         pdfFile,
         photoAttachments
       });
@@ -1998,13 +2009,14 @@ async function sendEmail() {
       showToast(`E-mail enviado com PDF anexado${attachmentsInfo} pela Vercel.`, "success");
       return;
     } catch (error) {
+      apiErrorMessage = error?.message || "";
       console.warn("Envio serverless indisponível, usando fallback local:", error);
     }
   }
 
-  const copied = await copyTextToClipboard(bodyText);
+  const copied = await copyTextToClipboard(fallbackBodyText);
   const subject = encodeURIComponent(subjectText);
-  const encodedBody = encodeURIComponent(bodyText);
+  const encodedBody = encodeURIComponent(fallbackBodyText);
 
   if (pdfFile) {
     downloadBlobFile(pdfFile.name, pdfFile);
@@ -2016,7 +2028,10 @@ async function sendEmail() {
     const photoMessage = state.photoFiles.length
       ? " As fotos precisam ser anexadas manualmente neste fallback."
       : "";
-    showToast(`API indisponível aqui. O e-mail abriu e o PDF foi baixado para anexo manual.${photoMessage}`, "warning");
+    const configMessage = apiErrorMessage.includes("RESEND_API_KEY") || apiErrorMessage.includes("CHECKLIST_FROM_EMAIL")
+      ? " A Vercel ainda esta sem as variaveis de e-mail configuradas."
+      : "";
+    showToast(`API indisponível aqui. O e-mail abriu e o PDF foi baixado para anexo manual.${photoMessage}${configMessage}`, "warning");
     return;
   }
 
